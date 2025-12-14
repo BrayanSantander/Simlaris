@@ -1,53 +1,48 @@
-// Simlaris/app/dashboard/page.tsx
-"use client"
+'use client'
 
-import React, { useEffect, useState } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { db } from "../../firebase"; // Ajusta la ruta si tu firebase.ts está en otra carpeta
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import React, { useEffect, useState } from 'react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
-type Dato = {
-  name: string;
-  valor: number;
-};
+// Datos de ejemplo para el gráfico
+const exampleData = [
+  { name: 'Ene', valor: 400 },
+  { name: 'Feb', valor: 300 },
+  { name: 'Mar', valor: 500 },
+  { name: 'Abr', valor: 200 },
+  { name: 'May', valor: 278 },
+]
 
-export default function PanelGeneral() {
-  const [datos, setDatos] = useState<Dato[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function DashboardPage() {
+  // Aquí puedes agregar estado para datos dinámicos
+  const [chartData, setChartData] = useState(exampleData)
 
   useEffect(() => {
-    const fetchDatos = async () => {
-      try {
-        const q = query(collection(db, "datosGraficos"), orderBy("fecha", "asc"), limit(50));
-        const snapshot = await getDocs(q);
-        const tempDatos: Dato[] = snapshot.docs.map(doc => ({
-          name: doc.data().fecha || "Sin fecha",
-          valor: doc.data().valor || 0,
-        }));
-        setDatos(tempDatos);
-      } catch (error) {
-        console.error("Error cargando datos de Firestore:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDatos();
-  }, []);
-
-  if (loading) return <p>Cargando gráficos...</p>;
+    // Simulación de actualización de datos desde Firebase o API
+    // setChartData(fetchDatos())
+  }, [])
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1>Panel General</h1>
-      <h2>Gráfico de ejemplo</h2>
-      <LineChart width={800} height={400} data={datos}>
-        <CartesianGrid stroke="#ccc" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Line type="monotone" dataKey="valor" stroke="#8884d8" />
-      </LineChart>
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h1 style={{ marginBottom: '20px' }}>Panel General</h1>
+
+      {/* Contenedor del gráfico */}
+      <div style={{ width: '100%', height: 400, marginBottom: '40px' }}>
+        <ResponsiveContainer>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="valor" stroke="#8884d8" activeDot={{ r: 8 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Aquí puedes agregar más gráficos */}
+      <div style={{ width: '100%', height: 400 }}>
+        <p>Otros gráficos se pueden agregar aquí</p>
+      </div>
     </div>
-  );
+  )
 }
