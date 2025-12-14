@@ -1,30 +1,24 @@
-# Etapa 1: Build
-FROM node:20 AS builder
+# Usamos Node 20 (Next 16 requiere >=20)
+FROM node:20
 
+# Establecemos el directorio de trabajo
 WORKDIR /app
 
-# Instalamos dependencias
+# Copiamos package.json y lockfile
 COPY package*.json ./
-RUN npm install
+COPY pnpm-lock.yaml ./
 
-# Copiamos el código y compilamos
+# Instalamos dependencias (puedes usar --frozen-lockfile si usas pnpm)
+RUN npm install --production
+
+# Copiamos todo el proyecto
 COPY . .
-RUN npm run build
 
-# Etapa 2: Producción
-FROM node:20-slim
+# Usamos el puerto que Cloud Run provee
+ENV PORT $PORT
 
-WORKDIR /app
+# Exponemos el puerto
+EXPOSE $PORT
 
-# Copiamos lo necesario de la build
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-
-# Puerto que Cloud Run asigna
-ENV PORT 8080
-EXPOSE 8080
-
-# Ejecutar Next.js en producción
-CMD ["npx", "next", "start", "-p", "8080"]
+# Comando para arrancar Next.js
+CMD ["npm", "start"]
