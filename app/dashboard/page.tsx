@@ -65,10 +65,33 @@ export default function DashboardPage() {
     )
   }
 
+  // Estadísticas generales
   const operationalCount = machines.filter((m) => m.status === "operational").length
   const warningCount = machines.filter((m) => m.status === "warning").length
   const criticalCount = machines.filter((m) => m.status === "critical").length
   const avgEfficiency = Math.round(machines.reduce((acc, m) => acc + m.efficiency, 0) / machines.length) || 0
+
+  // ----------------------
+  // Transformar datos para gráficos
+  // ----------------------
+
+  // 1. Estado de Maquinaria (MachinesStatusChart)
+  const chartMachines = machines.map(m => ({
+    id: m.id,
+    name: m.name,
+    value: m.efficiency,   // indicador a mostrar
+    warning: 70,           // umbral de advertencia
+    critical: 90,          // umbral crítico
+  }))
+
+  // 2. Datos de Sensores (SensorLineChart)
+  const sensorData = machines.flatMap(m =>
+    m.sensors?.map(s => ({
+      timestamp: s.timestamp,
+      value: s.vibrationRMS, // indicador a mostrar
+      machineName: m.name,
+    })) || []
+  )
 
   return (
     <div className="space-y-6">
@@ -90,21 +113,16 @@ export default function DashboardPage() {
       {/* Gráfico de Estado de Maquinaria */}
       <div className="bg-white shadow rounded p-4">
         <h2 className="text-xl font-semibold mb-4">Estado de Maquinaria</h2>
-        <MachinesStatusChart machines={machines} />
+        <MachinesStatusChart machines={chartMachines} />
       </div>
 
       {/* Gráfico de Sensores */}
       <div className="bg-white shadow rounded p-4">
         <h2 className="text-xl font-semibold mb-4">Sensores en Tiempo Real</h2>
-        <SensorLineChart
-          data={machines.flatMap((m) =>
-            m.sensors?.map((s) => ({ timestamp: s.timestamp, value: s.vibration })) || []
-          )}
-          label="Vibración RMS"
-        />
+        <SensorLineChart data={sensorData} label="Vibración RMS" />
       </div>
 
-      {/* Recent Alerts */}
+      {/* Alertas recientes */}
       {alerts.length > 0 && (
         <Card>
           <CardHeader>
