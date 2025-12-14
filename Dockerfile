@@ -1,21 +1,24 @@
-# Usa Node.js 18 como base
-FROM node:18
+# Usa Node.js 20 como base (Next 16 requiere >= Node 20)
+FROM node:20-alpine
 
-# Directorio de trabajo dentro del contenedor
+# Establece el directorio de trabajo
 WORKDIR /app
 
-# Copia package.json y package-lock.json
+# Copia los archivos de dependencias primero
 COPY package*.json ./
 
-# Instala solo dependencias de producción
+# Instala dependencias
 RUN npm install --production
 
-# Copia el resto de los archivos de la app
+# Copia el resto del proyecto
 COPY . .
 
-# Exponer el puerto que Cloud Run asignará
+# Construye la app de Next.js
+RUN npm run build
+
+# Puerto que Cloud Run asigna
 ENV PORT $PORT
 EXPOSE $PORT
 
-# Comando para iniciar la aplicación
-CMD ["node", "index.js"]
+# Comando para iniciar Next.js
+CMD ["npm", "start"]
