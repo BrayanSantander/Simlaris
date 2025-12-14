@@ -9,6 +9,10 @@ import { AlertCard } from "@/components/alert-card"
 import { FleetStats } from "@/components/fleet-stats"
 import { AlertTriangle, Factory, Loader2 } from "lucide-react"
 
+// Gráficos
+import MachinesStatusChart from "@/components/charts/MachinesStatusChart"
+import SensorLineChart from "@/components/charts/SensorLineChart"
+
 export default function DashboardPage() {
   const [machines, setMachines] = useState<Machine[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
@@ -82,6 +86,23 @@ export default function DashboardPage() {
         critical={criticalCount}
         avgEfficiency={avgEfficiency}
       />
+
+      {/* Gráfico de Estado de Maquinaria */}
+      <div className="bg-white shadow rounded p-4">
+        <h2 className="text-xl font-semibold mb-4">Estado de Maquinaria</h2>
+        <MachinesStatusChart machines={machines} />
+      </div>
+
+      {/* Gráfico de Sensores */}
+      <div className="bg-white shadow rounded p-4">
+        <h2 className="text-xl font-semibold mb-4">Sensores en Tiempo Real</h2>
+        <SensorLineChart
+          data={machines.flatMap((m) =>
+            m.sensors?.map((s) => ({ timestamp: s.timestamp, value: s.vibration })) || []
+          )}
+          label="Vibración RMS"
+        />
+      </div>
 
       {/* Recent Alerts */}
       {alerts.length > 0 && (
