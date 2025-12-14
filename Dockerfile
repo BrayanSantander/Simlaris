@@ -1,24 +1,29 @@
-# Usamos Node 20 (Next 16 requiere >=20)
-FROM node:20
+# Dockerfile para Next.js + Cloud Run
 
-# Establecemos el directorio de trabajo
+# 1️⃣ Imagen base oficial de Node.js LTS
+FROM node:20-alpine
+
+# 2️⃣ Crear directorio de la app
 WORKDIR /app
 
-# Copiamos package.json y lockfile
+# 3️⃣ Copiar package.json y pnpm-lock.yaml (o package-lock.json)
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 
-# Instalamos dependencias (puedes usar --frozen-lockfile si usas pnpm)
+# 4️⃣ Instalar dependencias
 RUN npm install --production
 
-# Copiamos todo el proyecto
+# 5️⃣ Copiar el resto del proyecto
 COPY . .
 
-# Usamos el puerto que Cloud Run provee
+# 6️⃣ Construir la app para producción
+RUN npm run build
+
+# 7️⃣ Definir variable de puerto (Cloud Run pasa PORT automáticamente)
 ENV PORT $PORT
 
-# Exponemos el puerto
+# 8️⃣ Exponer el puerto
 EXPOSE $PORT
 
-# Comando para arrancar Next.js
+# 9️⃣ Comando para arrancar la app en producción
 CMD ["npm", "start"]
