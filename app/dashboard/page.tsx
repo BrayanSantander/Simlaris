@@ -1,48 +1,66 @@
-'use client'
+"use client"
 
-import React, { useEffect, useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-
-// Datos de ejemplo para el gráfico
-const exampleData = [
-  { name: 'Ene', valor: 400 },
-  { name: 'Feb', valor: 300 },
-  { name: 'Mar', valor: 500 },
-  { name: 'Abr', valor: 200 },
-  { name: 'May', valor: 278 },
-]
+import React, { useEffect, useState } from "react"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts"
+import { FirestoreService } from "@/lib/services/firestore-service"
+import type { Machine } from "@/lib/types"
 
 export default function DashboardPage() {
-  // Aquí puedes agregar estado para datos dinámicos
-  const [chartData, setChartData] = useState(exampleData)
+  const [machines, setMachines] = useState<Machine[]>([])
+
+  // Simulación de datos de gráficos por máquina
+  const [chartData, setChartData] = useState<any[]>([])
 
   useEffect(() => {
-    // Simulación de actualización de datos desde Firebase o API
-    // setChartData(fetchDatos())
+    const unsubscribe = FirestoreService.subscribeMachines((machinesData) => {
+      setMachines(machinesData)
+
+      // Crear datos de ejemplo para el gráfico por máquina
+      const data = machinesData.map((m, i) => ({
+        name: m.name,
+        production: Math.floor(Math.random() * 500) + 100,
+        downtime: Math.floor(Math.random() * 50),
+      }))
+      setChartData(data)
+    })
+
+    return () => unsubscribe()
   }, [])
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ marginBottom: '20px' }}>Panel General</h1>
+    <div className="p-6 space-y-6">
+      <h1 className="text-3xl font-bold">Panel General</h1>
+      <p className="text-muted-foreground">
+        Visualización de datos de producción y tiempo de inactividad por máquina
+      </p>
 
-      {/* Contenedor del gráfico */}
-      <div style={{ width: '100%', height: 400, marginBottom: '40px' }}>
-        <ResponsiveContainer>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="valor" stroke="#8884d8" activeDot={{ r: 8 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Aquí puedes agregar más gráficos */}
-      <div style={{ width: '100%', height: 400 }}>
-        <p>Otros gráficos se pueden agregar aquí</p>
-      </div>
+      {machines.length === 0 ? (
+        <p>No hay máquinas registradas aún.</p>
+      ) : (
+        <div className="bg-white p-4 rounded shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Producción y tiempo de inactividad</h2>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="production" stroke="#8884d8" />
+              <Line type="monotone" dataKey="downtime" stroke="#82ca9d" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   )
 }
