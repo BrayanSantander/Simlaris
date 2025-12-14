@@ -1,19 +1,12 @@
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start -p $PORT",
-  "lint": "eslint ."
-}
-
 {
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
     "dev": "next dev",
-    "lint": "eslint .",
-    "start": "next start -p $PORT"
+    "build": "next build",
+    "start": "next start -p $PORT",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@google-cloud/bigquery": "8.1.1",
