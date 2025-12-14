@@ -1,29 +1,24 @@
-# Dockerfile para Next.js + Cloud Run
-
-# 1️⃣ Imagen base oficial de Node.js LTS
+# Dockerfile para Next.js en Cloud Run
 FROM node:20-alpine
 
-# 2️⃣ Crear directorio de la app
+# Directorio de trabajo
 WORKDIR /app
 
-# 3️⃣ Copiar package.json y lock file
+# Copiar package.json y lockfile
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 
-# 4️⃣ Instalar dependencias (producción)
-RUN npm install --production
+# Instalar dependencias (producción)
+RUN npm install --omit=dev
 
-# 5️⃣ Copiar todo el proyecto
+# Copiar el resto del proyecto
 COPY . .
 
-# 6️⃣ Construir la app para producción
+# Construir la app
 RUN npm run build
 
-# 7️⃣ Definir puerto para Cloud Run
-ENV PORT=8080
+# Puerto que usa Cloud Run
+ENV PORT 8080
 
-# 8️⃣ Exponer el puerto
-EXPOSE 8080
-
-# 9️⃣ Comando para arrancar la app
+# Comando para iniciar la app
 CMD ["npm", "start"]
