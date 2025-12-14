@@ -1,9 +1,29 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/simlaris-app', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/simlaris-app']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - simlaris
+      - --image
+      - gcr.io/$PROJECT_ID/simlaris-app
+      - --region
+      - southamerica-west1
+      - --platform
+      - managed
+      - --allow-unauthenticated
+
 images:
   - 'gcr.io/$PROJECT_ID/simlaris-app'
 
 options:
-  logging: CLOUD_LOGGING_ONLY   # Esto envía los logs solo a Cloud Logging
-  machineType: 'E2_HIGHCPU_8'  # opcional, para builds más rápidas
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+
+
+
