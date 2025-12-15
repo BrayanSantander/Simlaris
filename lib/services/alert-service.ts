@@ -1,114 +1,152 @@
-// Servicio para gestión de alertas
+import { FirestoreService } from "./firestore-service"
+import type { Machine, SensorData, Alert } from "@/lib/types"
 
-import type { Alert, SensorData, Threshold } from "@/lib/types"
-import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+export interface ThresholdViolation {
+  type: "vibration" | "temperature" | "pressure" | "humidity"
+  value: number
+  threshold: number
+  severity: "warning" | "critical"
+}
 
-export class AlertService {
+export class AlertGeneratorService {
   /**
-   * Evalúa datos de sensores y genera alertas si superan umbrales
+   * Verifica si los datos del sensor violan algún umbral configurado
    */
-  static async evaluateAndCreateAlerts(
-    machineId: string,
-    machineName: string,
-    data: SensorData,
-    thresholds: Threshold,
-  ): Promise<Alert[]> {
-    const alerts: Alert[] = []
+  static checkThresholds(machine: Machine, data: SensorData): ThresholdViolation[] {
+    const violations: ThresholdViolation[] = []
+    const thresholds = machine.thresholds
 
-    // Verificar vibración
-    if (data.vibrationRMS > thresholds.vibrationRMSMax * 0.8) {
-      alerts.push({
-        id: `alert-${Date.now()}-vibration`,
-        machineId,
-        machineName,
-        type: "vibration",
-        severity: data.vibrationRMS > thresholds.vibrationRMSMax ? "critical" : "warning",
-        message: `Vibración RMS en ${data.vibrationRMS.toFixed(3)}g excede el ${((data.vibrationRMS / thresholds.vibrationRMSMax) * 100).toFixed(0)}% del umbral`,
-        timestamp: Date.now(),
-        acknowledged: false,
-      })
+    if (!thresholds) return violations
+
+    // Vibración RMS (convertir a m/s² para comparar con maxAcceleration)
+    const vibrationMS2 = data.vibrationRMS * 9.81 // g a m/s²
+    if (thresholds.maxAcceleration > 0) {
+      if (vibrationMS2 > thresholds.maxAcceleration * 1.5) {
+        violations.push({
+          type: "vibration",
+          value: vibrationMS2,
+          threshold: thresholds.maxAcceleration,
+          severity: "critical",
+        })
+      } else if (vibrationMS2 > thresholds.maxAcceleration) {
+        violations.push({
+          type: "vibration",
+          value: vibrationMS2,
+          threshold: thresholds.maxAcceleration,
+          severity: "warning",
+        })
+      }
     }
 
-    // Verificar presión
-    if (data.pressure > thresholds.pressureMax * 0.9) {
-      alerts.push({
-        id: `alert-${Date.now()}-pressure`,
-        machineId,
-        machineName,
-        type: "pressure",
-        severity: data.pressure > thresholds.pressureMax ? "critical" : "warning",
-        message: `Presión hidráulica en ${data.pressure.toFixed(2)} MPa excede límites seguros`,
-        timestamp: Date.now(),
-        acknowledged: false,
-      })
+    // Temperatura
+    if (thresholds.maxTemperature > 0) {
+      if (data.temperature > thresholds.maxTemperature * 1.2) {
+        violations.push({
+          type: "temperature",
+          value: data.temperature,
+          threshold: thresholds.maxTemperature,
+          severity: "critical",
+        })
+      } else if (data.temperature > thresholds.maxTemperature) {
+        violations.push({
+          type: "temperature",
+          value: data.temperature,
+          threshold: thresholds.maxTemperature,
+          severity: "warning",
+        })
+      }
     }
 
-    // Verificar temperatura
-    if (data.temperature > thresholds.temperatureMax * 0.85) {
-      alerts.push({
-        id: `alert-${Date.now()}-temperature`,
-        machineId,
-        machineName,
-        type: "temperature",
-        severity: data.temperature > thresholds.temperatureMax ? "critical" : "warning",
-        message: `Temperatura en ${data.temperature.toFixed(1)}°C supera nivel recomendado`,
-        timestamp: Date.now(),
-        acknowledged: false,
-      })
+    // Presión (convertir bar a PSI)
+    const pressurePSI = data.pressure * 145.038
+    if (thresholds.maxPressurePSI > 0) {
+      if (pressurePSI > thresholds.maxPressurePSI * 1.2) {
+        violations.push({
+          type: "pressure",
+          value: pressurePSI,
+          threshold: thresholds.maxPressurePSI,
+          severity: "critical",
+        })
+      } else if (pressurePSI > thresholds.maxPressurePSI) {
+        violations.push({
+          type: "pressure",
+          value: pressurePSI,
+          threshold: thresholds.maxPressurePSI,
+          severity: "warning",
+        })
+      }
     }
 
-    // Verificar humedad
-    if (data.humidity > thresholds.humidityMax) {
-      alerts.push({
-        id: `alert-${Date.now()}-humidity`,
-        machineId,
-        machineName,
-        type: "humidity",
-        severity: "warning",
-        message: `Humedad en ${data.humidity.toFixed(0)}% excede límite establecido`,
-        timestamp: Date.now(),
-        acknowledged: false,
-      })
+    // Humedad
+    if (thresholds.maxHumidity > 0) {
+      if (data.humidity > thresholds.maxHumidity * 1.2) {
+        violations.push({
+          type: "humidity",
+          value: data.humidity,
+          threshold: thresholds.maxHumidity,
+          severity: "critical",
+        })
+      } else if (data.humidity > thresholds.maxHumidity) {
+        violations.push({
+          type: "humidity",
+          value: data.humidity,
+          threshold: thresholds.maxHumidity,
+          severity: "warning",
+        })
+      }
     }
 
-    return alerts
+    return violations
   }
 
   /**
-   * Guarda una alerta en Firestore
+   * Genera mensajes de alerta según el tipo de violación
    */
-  static async saveAlert(alert: Alert): Promise<void> {
-    await addDoc(collection(db, "alerts"), {
-      ...alert,
-      createdAt: Date.now(),
-    })
-  }
-
-  /**
-   * Obtiene alertas desde Firestore
-   */
-  static async getAlerts(machineId?: string): Promise<Alert[]> {
-    let q = query(collection(db, "alerts"))
-
-    if (machineId) {
-      q = query(collection(db, "alerts"), where("machineId", "==", machineId))
+  static generateAlertMessage(violation: ThresholdViolation): string {
+    const typeNames: Record<string, string> = {
+      vibration: "Vibración",
+      temperature: "Temperatura",
+      pressure: "Presión",
+      humidity: "Humedad",
     }
 
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Alert[]
+    const units: Record<string, string> = {
+      vibration: "m/s²",
+      temperature: "°C",
+      pressure: "PSI",
+      humidity: "%",
+    }
+
+    const severityText = violation.severity === "critical" ? "CRÍTICO" : "ADVERTENCIA"
+
+    return `${severityText}: ${typeNames[violation.type]} en ${violation.value.toFixed(1)} ${units[violation.type]} (umbral: ${violation.threshold.toFixed(1)} ${units[violation.type]})`
   }
 
   /**
-   * Reconoce una alerta
+   * Crea alertas en Firestore para las violaciones detectadas
    */
-  static async acknowledgeAlert(alertId: string): Promise<void> {
-    await updateDoc(doc(db, "alerts", alertId), {
-      acknowledged: true,
-      acknowledgedAt: Date.now(),
-    })
+  static async createAlertsForViolations(
+    machine: Machine,
+    violations: ThresholdViolation[],
+    existingAlertTypes: Set<string>,
+  ): Promise<void> {
+    for (const violation of violations) {
+      // Evitar crear alertas duplicadas del mismo tipo en los últimos 5 minutos
+      const alertKey = `${machine.id}-${violation.type}-${violation.severity}`
+      if (existingAlertTypes.has(alertKey)) continue
+
+      const alert: Omit<Alert, "id"> = {
+        machineId: machine.id,
+        machineName: machine.name,
+        type: violation.type,
+        severity: violation.severity,
+        message: this.generateAlertMessage(violation),
+        timestamp: Date.now(),
+        acknowledged: false,
+      }
+
+      await FirestoreService.createAlert(alert)
+      existingAlertTypes.add(alertKey)
+    }
   }
 }
