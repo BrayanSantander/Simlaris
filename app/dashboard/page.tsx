@@ -1,5 +1,7 @@
 "use client"
 
+import type { SensorData } from "@/lib/types"
+import { EfficiencyService } from "@/lib/services/efficiency-service"
 import { useEffect, useState } from "react"
 import type { Machine, Alert as AlertType } from "@/lib/types"
 import { FirestoreService } from "@/lib/services/firestore-service"
@@ -11,18 +13,26 @@ import { SensorCharts } from "@/components/sensor-charts"
 import { AlertTriangle, Factory, Loader2 } from "lucide-react"
 
 export default function DashboardPage() {
+  // -------------------------------
+  // 1️⃣ Estados
+  // -------------------------------
   const [machines, setMachines] = useState<Machine[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
   const [loading, setLoading] = useState(true)
+  const [averageEfficiency, setAverageEfficiency] = useState(0)
+  const [sensorsByMachine, setSensorsByMachine] = useState<
+    Record<string, SensorData[]>
+  >({})
 
+  // -------------------------------
+  // 2️⃣ useEffect: Máquinas y alertas
+  // -------------------------------
   useEffect(() => {
-    // Suscripción a máquinas
     const unsubscribe = FirestoreService.subscribeMachines((updatedMachines) => {
       setMachines(updatedMachines)
       setLoading(false)
     })
 
-    // Cargar alertas
     const loadAlerts = async () => {
       const alertsData = await FirestoreService.getAlerts()
       setAlerts(alertsData)
@@ -37,6 +47,62 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // -------------------------------
+  // 3️⃣ useEffect: Escuchar sensores por máquina
+  // -------------------------------
+  useEffect(() => {
+    if (machines.length === 0) return
+
+    const unsubscribes: (() => void)[] = []
+
+    machines.forEach((machine) => {
+      const unsubscribe = FirestoreService.subscribeSensorData(
+        machine.id,
+        (sensorData) => {
+          setSensorsByMachine((prev) => ({
+            ...prev,
+            [machine.id]: sensorData,
+          }))
+        }
+      )
+      unsubscribes.push(unsubscribe)
+    })
+
+    return () => {
+      unsubscribes.forEach((u) => u())
+    }
+  }, [machines])
+
+  // -------------------------------
+  // 4️⃣ useEffect: Calcular eficiencia promedio
+  // -------------------------------
+  useEffect(() => {
+    const efficiencies: number[] = []
+
+    Object.entries(sensorsByMachine).forEach(([machineId, sensors]) => {
+      const machine = machines.find((m) => m.id === machineId)
+      if (!machine) return
+
+      const efficiency =
+        EfficiencyService.calculateMachineEfficiency(machine, sensors)
+
+      efficiencies.push(efficiency)
+    })
+
+    if (efficiencies.length === 0) {
+      setAverageEfficiency(0)
+      return
+    }
+
+    const avg =
+      efficiencies.reduce((a, b) => a + b, 0) / efficiencies.length
+
+    setAverageEfficiency(Math.round(avg))
+  }, [sensorsByMachine, machines])
+
+  // -------------------------------
+  // 5️⃣ Render
+  // -------------------------------
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -56,7 +122,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <FleetStats />
+      <FleetStats averageEfficiency={averageEfficiency} />
 
       {/* Charts */}
       <SensorCharts machines={machines} />
