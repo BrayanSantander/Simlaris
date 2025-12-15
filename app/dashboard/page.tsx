@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import type { Machine, Alert as AlertType } from "@/lib/types"
 import { FirestoreService } from "@/lib/services/firestore-service"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { MachineCard } from "@/components/machine-card"
 import { AlertCard } from "@/components/alert-card"
 import { FleetStats } from "@/components/fleet-stats"
@@ -59,7 +59,7 @@ export default function DashboardPage() {
       <FleetStats />
 
       {/* Charts */}
-      <SensorCharts />
+      <SensorCharts machines={machines} />
 
       {/* Alerts */}
       <div>
