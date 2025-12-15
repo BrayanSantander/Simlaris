@@ -4,7 +4,6 @@ import SensorLineChart from "@/components/charts/SensorLineChart"
 import MachinesStatusChart from "@/components/charts/MachinesStatusChart"
 
 export function SensorCharts() {
-  // 🔹 Datos simulados (mock)
   const sensorData = [
     { timestamp: "10:00", value: 22 },
     { timestamp: "10:05", value: 25 },
