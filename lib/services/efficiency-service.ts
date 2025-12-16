@@ -1,5 +1,5 @@
 import type { Machine, SensorData } from "@/lib/types"
-import { AlertGeneratorService } from "./alert-service"
+import { AlertGeneratorService } from "./alert-generator"
 
 export class EfficiencyService {
   /**
