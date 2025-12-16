@@ -1,37 +1,44 @@
 "use client"
 
-import type { SensorData } from "@/lib/types"
-import { EfficiencyService } from "@/lib/services/efficiency-service"
 import { useEffect, useState } from "react"
-import type { Machine, Alert as AlertType } from "@/lib/types"
+
+import type { Machine, Alert as AlertType, SensorData } from "@/lib/types"
+
 import { FirestoreService } from "@/lib/services/firestore-service"
+import { EfficiencyService } from "@/lib/services/efficiency-service"
+
 import { Card, CardContent } from "@/components/ui/card"
 import { MachineCard } from "@/components/machine-card"
 import { AlertCard } from "@/components/alert-card"
 import { FleetStats } from "@/components/fleet-stats"
 import { SensorCharts } from "@/components/sensor-charts"
+
 import { AlertTriangle, Factory, Loader2 } from "lucide-react"
 
 export default function DashboardPage() {
-  // -------------------------------
+  // -------------------------------------
   // 1️⃣ Estados
-  // -------------------------------
+  // -------------------------------------
   const [machines, setMachines] = useState<Machine[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
   const [loading, setLoading] = useState(true)
+
   const [averageEfficiency, setAverageEfficiency] = useState(0)
+
   const [sensorsByMachine, setSensorsByMachine] = useState<
     Record<string, SensorData[]>
   >({})
 
-  // -------------------------------
-  // 2️⃣ useEffect: Máquinas y alertas
-  // -------------------------------
+  // -------------------------------------
+  // 2️⃣ Máquinas y alertas
+  // -------------------------------------
   useEffect(() => {
-    const unsubscribe = FirestoreService.subscribeMachines((updatedMachines) => {
-      setMachines(updatedMachines)
-      setLoading(false)
-    })
+    const unsubscribeMachines = FirestoreService.subscribeMachines(
+      (updatedMachines) => {
+        setMachines(updatedMachines)
+        setLoading(false)
+      }
+    )
 
     const loadAlerts = async () => {
       const alertsData = await FirestoreService.getAlerts()
@@ -42,30 +49,33 @@ export default function DashboardPage() {
     const interval = setInterval(loadAlerts, 30000)
 
     return () => {
-      unsubscribe()
+      unsubscribeMachines()
       clearInterval(interval)
     }
   }, [])
 
-  // -------------------------------
-  // 3️⃣ useEffect: Escuchar sensores por máquina
-  // -------------------------------
+  // -------------------------------------
+  // 3️⃣ Sensores en tiempo real por máquina
+  // -------------------------------------
   useEffect(() => {
     if (machines.length === 0) return
 
     const unsubscribes: (() => void)[] = []
 
     machines.forEach((machine) => {
-      const unsubscribe = FirestoreService.subscribeSensorData(
+      FirestoreService.subscribeToLatestSensorData(
         machine.id,
         (sensorData) => {
+          if (!sensorData) return
+
           setSensorsByMachine((prev) => ({
             ...prev,
-            [machine.id]: sensorData,
+            [machine.id]: [sensorData],
           }))
         }
-      )
-      unsubscribes.push(unsubscribe)
+      ).then((unsubscribe) => {
+        unsubscribes.push(unsubscribe)
+      })
     })
 
     return () => {
@@ -73,21 +83,26 @@ export default function DashboardPage() {
     }
   }, [machines])
 
-  // -------------------------------
-  // 4️⃣ useEffect: Calcular eficiencia promedio
-  // -------------------------------
+  // -------------------------------------
+  // 4️⃣ Cálculo de eficiencia promedio
+  // -------------------------------------
   useEffect(() => {
     const efficiencies: number[] = []
 
-    Object.entries(sensorsByMachine).forEach(([machineId, sensors]) => {
-      const machine = machines.find((m) => m.id === machineId)
-      if (!machine) return
+    Object.entries(sensorsByMachine).forEach(
+      ([machineId, sensorDataArray]) => {
+        const machine = machines.find((m) => m.id === machineId)
+        if (!machine) return
 
-      const efficiency =
-        EfficiencyService.calculateMachineEfficiency(machine, sensors)
+        const efficiency =
+          EfficiencyService.calculateMachineEfficiency(
+            machine,
+            sensorDataArray
+          )
 
-      efficiencies.push(efficiency)
-    })
+        efficiencies.push(efficiency)
+      }
+    )
 
     if (efficiencies.length === 0) {
       setAverageEfficiency(0)
@@ -100,9 +115,9 @@ export default function DashboardPage() {
     setAverageEfficiency(Math.round(avg))
   }, [sensorsByMachine, machines])
 
-  // -------------------------------
-  // 5️⃣ Render
-  // -------------------------------
+  // -------------------------------------
+  // 5️⃣ Loading
+  // -------------------------------------
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -111,27 +126,34 @@ export default function DashboardPage() {
     )
   }
 
+  // -------------------------------------
+  // 6️⃣ Render
+  // -------------------------------------
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Panel General</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Panel General
+        </h1>
         <p className="text-muted-foreground mt-1">
           Estado general de la flota y sensores en tiempo real
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Estadísticas */}
       <FleetStats averageEfficiency={averageEfficiency} />
 
-      {/* Charts */}
+      {/* Gráficos */}
       <SensorCharts machines={machines} />
 
-      {/* Alerts */}
+      {/* Alertas */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="h-5 w-5 text-chart-5" />
-          <h2 className="text-xl font-semibold">Alertas recientes</h2>
+          <h2 className="text-xl font-semibold">
+            Alertas recientes
+          </h2>
         </div>
 
         {alerts.length === 0 ? (
@@ -149,11 +171,13 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Machines */}
+      {/* Máquinas */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <Factory className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold">Máquinas</h2>
+          <h2 className="text-xl font-semibold">
+            Máquinas
+          </h2>
         </div>
 
         {machines.length === 0 ? (
@@ -165,7 +189,10 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {machines.map((machine) => (
-              <MachineCard key={machine.id} machine={machine} />
+              <MachineCard
+                key={machine.id}
+                machine={machine}
+              />
             ))}
           </div>
         )}
